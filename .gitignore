@@ -8,11 +8,23 @@ ENV/
 env.bak/
 venv.bak/
 
+# GCP credentials
+credentials/
+!credentials/.gitkeep
+
+# Terraform state and secrets
+terraform/.terraform/
+terraform/terraform.tfvars
+terraform/*.tfstate
+terraform/*.tfstate.backup
+terraform/.terraform.lock.hcl
+
 # Parquet
 *.parquet
 
 # Compiled python
 *.pyc
 
-# Data on raw
+# Data: keep backups, ignore downloaded raw
 data/raw/*.csv
+!data/raw/backup/
