@@ -13,17 +13,17 @@ BACKUP_DIR = Path("data/raw/backup")
 
 SOURCES = [
     {
-        "url": "https://datos.canarias.es/api/estadisticas/statistical-resources/v1.0/datasets/ISTAC/C00028A_000159/~latest.csv",
+        "url": "https://datos.canarias.es/api/estadisticas/statistical-resources/v1.0/datasets/ISTAC/C00028A_000159/~latest.csv?lang=en",
         "dest": RAW_DIR / "tourist_accommodations.csv",
         "backup": BACKUP_DIR / "tourist_accommodations.csv",
     },
     {
-        "url": "https://datos.canarias.es/api/estadisticas/statistical-resources/v1.0/datasets/ISTAC/C00028A_000060/~latest.csv",
+        "url": "https://datos.canarias.es/api/estadisticas/statistical-resources/v1.0/datasets/ISTAC/C00028A_000060/~latest.csv?lang=en",
         "dest": RAW_DIR / "tourist_age_sex.csv",
         "backup": BACKUP_DIR / "tourist_age_sex.csv",
     },
     {
-        "url": "https://datos.canarias.es/api/estadisticas/statistical-resources/v1.0/datasets/ISTAC/C00028A_000064/~latest.csv",
+        "url": "https://datos.canarias.es/api/estadisticas/statistical-resources/v1.0/datasets/ISTAC/C00028A_000064/~latest.csv?lang=en",
         "dest": RAW_DIR / "tourist_revenue.csv",
         "backup": BACKUP_DIR / "tourist_revenue.csv",
     },
