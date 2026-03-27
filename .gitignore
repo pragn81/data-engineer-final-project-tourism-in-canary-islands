@@ -28,6 +28,12 @@ terraform/.terraform.lock.hcl
 # Data: keep backups, ignore downloaded raw
 data/raw/*.csv
 !data/raw/backup/
+data/processed/
+
+# dbt generated artifacts
+dbt/target/
+dbt/logs/
+dbt/dbt_packages/
 
 # Cyclic Redundancy Check
 *.crc

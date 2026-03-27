@@ -1,0 +1,10 @@
+version: 2
+
+sources:
+  - name: raw
+    database: de-tourism-in-canary-islands
+    schema: tourism_raw
+    tables:
+      - name: tourist_accommodations
+      - name: tourist_age_sex
+      - name: tourist_revenue
