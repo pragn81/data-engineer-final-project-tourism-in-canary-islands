@@ -1,0 +1,17 @@
+# Extends the official Kestra image with Python 3.11 and uv.
+# The pipeline tasks run as PROCESS (inside this container), so Python
+# and uv must be available here alongside the Kestra JVM.
+FROM kestra/kestra:latest
+
+USER root
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3.11 \
+    python3.11-venv \
+    python3-pip \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install uv (fast Python package manager)
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+ENV PATH="/root/.local/bin:${PATH}"

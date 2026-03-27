@@ -1,0 +1,75 @@
+id: canary-islands-tourism-pipeline
+namespace: tourism
+
+description: |
+  End-to-end batch pipeline for Canary Islands tourism statistics (ISTAC).
+
+  Steps (sequential):
+    1. ingest    — Download raw CSVs from the ISTAC API (fallback to local backup)
+    2. transform — PySpark: clean columns, cast types, write Parquet partitioned by year
+    3. upload    — Upload raw CSVs + Parquet to GCS (raw and processed buckets)
+    4. load      — BigQuery Load Job: Parquet → tourism_raw.* (partitioned + clustered)
+    5. dbt_run   — dbt: staging views + mart tables in BigQuery
+
+  Schedule: first day of each quarter at 06:00 UTC.
+  Data source: https://datos.canarias.es (ISTAC open data)
+
+labels:
+  project: canary-islands-tourism
+  env: prod
+
+triggers:
+  - id: quarterly_schedule
+    type: io.kestra.plugin.core.trigger.Schedule
+    # Runs on Jan 1, Apr 1, Jul 1, Oct 1 at 06:00 UTC
+    cron: "0 6 1 1,4,7,10 *"
+
+tasks:
+
+  - id: ingest
+    type: io.kestra.plugin.scripts.shell.Commands
+    description: "Download raw CSVs from ISTAC API (30s timeout, fallback to backup)"
+    commands:
+      - cd /project && uv sync --frozen -q && uv run main.py ingest
+    env:
+      UV_PROJECT_ENVIRONMENT: /tmp/pipeline-venv
+
+  - id: transform
+    type: io.kestra.plugin.scripts.shell.Commands
+    description: "PySpark batch job: drop #es columns, normalise names, add period_date, write Parquet"
+    commands:
+      - cd /project && uv run main.py transform
+    env:
+      UV_PROJECT_ENVIRONMENT: /tmp/pipeline-venv
+      # Limit Spark driver memory to avoid OOM on small machines
+      JAVA_TOOL_OPTIONS: "-Xmx2g"
+
+  - id: upload
+    type: io.kestra.plugin.scripts.shell.Commands
+    description: "Upload raw CSVs → GCS raw bucket | Parquet → GCS processed bucket"
+    commands:
+      - cd /project && uv run main.py upload
+    env:
+      UV_PROJECT_ENVIRONMENT: /tmp/pipeline-venv
+
+  - id: load
+    type: io.kestra.plugin.scripts.shell.Commands
+    description: "BigQuery Load Job: GCS processed Parquet → tourism_raw (partitioned by period_date MONTH, clustered)"
+    commands:
+      - cd /project && uv run main.py load
+    env:
+      UV_PROJECT_ENVIRONMENT: /tmp/pipeline-venv
+
+  - id: dbt_run
+    type: io.kestra.plugin.scripts.shell.Commands
+    description: "dbt run: staging views (tourism_staging) + mart tables (tourism_mart)"
+    commands:
+      - cd /project && uv run dbt run --project-dir dbt --profiles-dir /root/.dbt
+    env:
+      UV_PROJECT_ENVIRONMENT: /tmp/pipeline-venv
+
+errors:
+  - id: notify_failure
+    type: io.kestra.plugin.core.log.Log
+    message: "Pipeline FAILED at task {{ task.id }}. Check logs for details."
+    level: ERROR

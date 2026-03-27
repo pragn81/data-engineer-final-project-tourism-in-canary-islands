@@ -1,0 +1,75 @@
+
+# Kestra orchestration stack.
+# Kestra UI: http://localhost:8080
+#
+# Usage:
+#   docker compose up -d
+#   Then open http://localhost:8080, go to Flows and import kestra/pipeline.yml
+
+services:
+
+  # ── Kestra metadata backend ───────────────────────────────────────────────
+  kestra-db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: kestra
+      POSTGRES_USER: kestra
+      POSTGRES_PASSWORD: k3str4
+    volumes:
+      - kestra-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kestra"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Kestra server ─────────────────────────────────────────────────────────
+  kestra:
+    build:
+      context: .
+      dockerfile: Dockerfile.kestra
+    entrypoint: /bin/bash
+    command: -c 'exec /app/kestra server standalone'
+    depends_on:
+      kestra-db:
+        condition: service_healthy
+    environment:
+      # UV: use an isolated Linux venv so the host macOS .venv is not touched
+      UV_PROJECT_ENVIRONMENT: /tmp/pipeline-venv
+      # Disable Micronaut security (basic auth) via direct env var
+      MICRONAUT_SECURITY_ENABLED: "false"
+      # Kestra internal config
+      KESTRA_CONFIGURATION: |
+        datasources:
+          postgres:
+            url: jdbc:postgresql://kestra-db:5432/kestra
+            driverClassName: org.postgresql.Driver
+            username: kestra
+            password: k3str4
+        kestra:
+          repository:
+            type: postgres
+          storage:
+            type: local
+            local:
+              basePath: "/app/storage"
+          queue:
+            type: postgres
+          tasks:
+            tmpDir:
+              path: /tmp/kestra-wd
+          url: http://localhost:8080/
+    volumes:
+      - kestra-storage:/app/storage
+      - /tmp/kestra-wd:/tmp/kestra-wd
+      # Project source code and data (writable so PySpark can write data/processed/)
+      - .:/project
+      # dbt profiles (read-only — contains BigQuery credentials path)
+      - ${HOME}/.dbt:/root/.dbt:ro
+    ports:
+      - "8080:8080"
+      - "8081:8081"
+
+volumes:
+  kestra-db-data:
+  kestra-storage:
