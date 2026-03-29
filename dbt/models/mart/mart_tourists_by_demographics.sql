@@ -29,7 +29,10 @@ with base as (
         sum(tourists) as total_tourists
     from {{ ref('stg_tourist_age_sex') }}
     -- Exclude totals to avoid double counting
-    where sex_code != '_T' and age_group_code != '_T'
+    where sex_code != '_T'
+      and age_group_code != '_T'
+      and country_code != '_T'
+      and period_date is not null
     group by 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11
 )
 
