@@ -38,6 +38,9 @@ services:
       UV_PROJECT_ENVIRONMENT: /tmp/pipeline-venv
       # Disable Micronaut security (basic auth) via direct env var
       MICRONAUT_SECURITY_ENABLED: "false"
+      # GCP variables — forwarded to Kestra flow tasks (used by dbt profiles.yml)
+      GCP_PROJECT_ID: ${GCP_PROJECT_ID}
+      GCP_REGION: ${GCP_REGION:-europe-west1}
       # Kestra internal config
       KESTRA_CONFIGURATION: |
         datasources:
@@ -64,8 +67,6 @@ services:
       - /tmp/kestra-wd:/tmp/kestra-wd
       # Project source code and data (writable so PySpark can write data/processed/)
       - .:/project
-      # dbt profiles (read-only — contains BigQuery credentials path)
-      - ${HOME}/.dbt:/root/.dbt:ro
     ports:
       - "8080:8080"
       - "8081:8081"

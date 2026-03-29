@@ -192,36 +192,28 @@ uv run main.py upload
 uv run main.py load
 ```
 
-### 5 — Configure dbt profile and run models
+### 5 — Run dbt models (optional if using Kestra)
 
-> **If using Kestra (step 6):** you still need to create the dbt profile below —
-> the Kestra container mounts `~/.dbt` as a read-only volume to run `dbt run`
-> inside the pipeline. Skip the `dbt run` command itself.
-
-Add the following to `~/.dbt/profiles.yml` (create the file if it does not exist):
-
-```yaml
-canary_islands_tourism:
-  target: dev
-  outputs:
-    dev:
-      type: bigquery
-      method: service-account
-      project: <your-gcp-project-id>
-      dataset: tourism_staging
-      keyfile: /absolute/path/to/credentials/pipeline_sa.json
-      location: europe-west1
-      threads: 4
-```
+> **If using Kestra (step 6):** skip this step entirely. The dbt profile is bundled
+> in `dbt/profiles.yml` and reads `GCP_PROJECT_ID` / `GCP_REGION` /
+> `GOOGLE_APPLICATION_CREDENTIALS` from the environment automatically.
 
 To run dbt manually:
 
 ```bash
 cd dbt
-dbt deps          # install packages (if any)
 dbt run           # creates staging views + mart tables
 dbt test          # optional: run schema tests
 cd ..
+```
+
+The profile at `dbt/profiles.yml` uses environment variables — make sure they are
+exported in your shell (or `source .env`) before running dbt locally:
+
+```bash
+export GCP_PROJECT_ID=<your-gcp-project-id>
+export GCP_REGION=europe-west1
+export GOOGLE_APPLICATION_CREDENTIALS=/absolute/path/to/credentials/pipeline_sa.json
 ```
 
 ### 6 — Run the full pipeline via Kestra
@@ -316,6 +308,9 @@ All dashboard queries filter by territory (Canary Islands vs sub-regions), and t
 │   ├── models/
 │   │   ├── staging/      # Views: stg_tourist_accommodations, stg_tourist_age_sex, stg_tourist_revenue
 │   │   └── mart/         # Tables: mart_tourists_by_accommodation, mart_tourists_by_demographics
+│   ├── macros/
+│   │   └── generate_schema_name.sql  # Prevents dbt schema name prefixing
+│   ├── profiles.yml      # dbt BigQuery profile (reads GCP_PROJECT_ID etc. from env)
 │   └── dbt_project.yml
 ├── ingestion/
 │   ├── download.py       # Download CSVs from ISTAC API

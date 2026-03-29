@@ -1,0 +1,11 @@
+canary_islands_tourism:
+  target: dev
+  outputs:
+    dev:
+      type: bigquery
+      method: service-account
+      project: "{{ env_var('GCP_PROJECT_ID') }}"
+      dataset: tourism_staging
+      keyfile: "{{ env_var('GOOGLE_APPLICATION_CREDENTIALS') }}"
+      location: "{{ env_var('GCP_REGION', 'europe-west1') }}"
+      threads: 4

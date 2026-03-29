@@ -64,9 +64,12 @@ tasks:
     type: io.kestra.plugin.scripts.shell.Commands
     description: "dbt run: staging views (tourism_staging) + mart tables (tourism_mart)"
     commands:
-      - cd /project && uv run dbt run --project-dir dbt --profiles-dir /root/.dbt
+      - cd /project && uv run dbt run --project-dir dbt --profiles-dir /project/dbt
     env:
       UV_PROJECT_ENVIRONMENT: /tmp/pipeline-venv
+      GCP_PROJECT_ID: "{{ envs.GCP_PROJECT_ID }}"
+      GCP_REGION: "{{ envs.GCP_REGION }}"
+      GOOGLE_APPLICATION_CREDENTIALS: /project/credentials/pipeline_sa.json
 
 errors:
   - id: notify_failure
