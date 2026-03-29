@@ -94,9 +94,17 @@ ingestion/download.py  ──►  data/raw/*.csv
 - Java 11+ on `PATH` (required by PySpark)
 - A GCP project with billing enabled
 
+### 1 — Clone & install dependencies
+
+```bash
+git clone <repo-url>
+cd data-engineer-final-project-tourism-in-canary-islands
+uv sync
+```
+
 #### GCP initial setup (once per project)
 
-**1. Enable the required APIs** — before creating a service account:
+**1. Enable the required APIs:**
 
 ```bash
 gcloud config set project <your-gcp-project-id>
@@ -126,16 +134,10 @@ gcloud iam service-accounts keys create credentials/service_account.json \
   --iam-account="terraform-admin@<your-gcp-project-id>.iam.gserviceaccount.com"
 ```
 
+Check the credentials/service_account.json is created.
+
 This key is used only by Terraform to provision resources. The pipeline uses a separate
 SA key (`credentials/pipeline_sa.json`) that Terraform creates automatically.
-
-### 1 — Clone & install dependencies
-
-```bash
-git clone <repo-url>
-cd data-engineer-final-project-tourism-in-canary-islands
-uv sync
-```
 
 ### 2 — Configure environment
 
@@ -202,8 +204,8 @@ To run dbt manually:
 
 ```bash
 cd dbt
-dbt run           # creates staging views + mart tables
-dbt test          # optional: run schema tests
+uv run dbt run           # creates staging views + mart tables
+uv run dbt test          # optional: run schema tests
 cd ..
 ```
 

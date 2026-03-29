@@ -34,6 +34,10 @@ data/processed/
 dbt/target/
 dbt/logs/
 dbt/dbt_packages/
+dbt/.user.yml
 
 # Cyclic Redundancy Check
 *.crc
+
+# Logs
+*.log

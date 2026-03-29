@@ -2,7 +2,7 @@ version: 2
 
 sources:
   - name: raw
-    database: de-tourism-in-canary-islands
+    database: "{{ env_var('GCP_PROJECT_ID') }}"
     schema: tourism_raw
     tables:
       - name: tourist_accommodations
