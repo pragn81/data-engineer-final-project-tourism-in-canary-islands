@@ -29,6 +29,8 @@ tasks:
   - id: ingest
     type: io.kestra.plugin.scripts.shell.Commands
     description: "Download raw CSVs from ISTAC API (30s timeout, fallback to backup)"
+    taskRunner:
+      type: io.kestra.plugin.core.runner.Process
     commands:
       - cd /project && uv sync --frozen -q && uv run main.py ingest
     env:
@@ -37,16 +39,21 @@ tasks:
   - id: transform
     type: io.kestra.plugin.scripts.shell.Commands
     description: "PySpark batch job: drop #es columns, normalise names, add period_date, write Parquet"
+    taskRunner:
+      type: io.kestra.plugin.core.runner.Process
     commands:
       - cd /project && uv run main.py transform
     env:
       UV_PROJECT_ENVIRONMENT: /tmp/pipeline-venv
-      # Limit Spark driver memory to avoid OOM on small machines
+      # PySpark 3.5 requires Java 8/11/17 — Kestra runs Java 25, so point to Java 17
+      JAVA_HOME: /usr/lib/jvm/java-17-pyspark
       JAVA_TOOL_OPTIONS: "-Xmx2g"
 
   - id: upload
     type: io.kestra.plugin.scripts.shell.Commands
     description: "Upload raw CSVs → GCS raw bucket | Parquet → GCS processed bucket"
+    taskRunner:
+      type: io.kestra.plugin.core.runner.Process
     commands:
       - cd /project && uv run main.py upload
     env:
@@ -55,6 +62,8 @@ tasks:
   - id: load
     type: io.kestra.plugin.scripts.shell.Commands
     description: "BigQuery Load Job: GCS processed Parquet → tourism_raw (partitioned by period_date MONTH, clustered)"
+    taskRunner:
+      type: io.kestra.plugin.core.runner.Process
     commands:
       - cd /project && uv run main.py load
     env:
@@ -63,12 +72,12 @@ tasks:
   - id: dbt_run
     type: io.kestra.plugin.scripts.shell.Commands
     description: "dbt run: staging views (tourism_staging) + mart tables (tourism_mart)"
+    taskRunner:
+      type: io.kestra.plugin.core.runner.Process
     commands:
       - cd /project && uv run dbt run --project-dir dbt --profiles-dir /project/dbt
     env:
       UV_PROJECT_ENVIRONMENT: /tmp/pipeline-venv
-      GCP_PROJECT_ID: "{{ envs.GCP_PROJECT_ID }}"
-      GCP_REGION: "{{ envs.GCP_REGION }}"
       GOOGLE_APPLICATION_CREDENTIALS: /project/credentials/pipeline_sa.json
 
 errors:

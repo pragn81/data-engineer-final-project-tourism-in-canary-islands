@@ -10,7 +10,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3.11-venv \
     python3-pip \
     curl \
+    openjdk-17-jdk \
     && rm -rf /var/lib/apt/lists/*
+
+# Stable arch-independent symlink so PySpark can use Java 17 instead of Kestra's Java 25
+RUN ln -s /usr/lib/jvm/java-17-openjdk-$(dpkg --print-architecture) /usr/lib/jvm/java-17-pyspark
+ENV JAVA17_HOME=/usr/lib/jvm/java-17-pyspark
 
 # Install uv (fast Python package manager)
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
