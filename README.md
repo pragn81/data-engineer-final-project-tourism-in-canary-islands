@@ -1,5 +1,26 @@
 # Data Engineering Zoomcamp Project: Tourism in Canary Islands
 
+## Table of contents
+
+- [Problem description](#problem-description)
+- [Architecture](#architecture)
+- [Tech stack](#tech-stack)
+- [Reproducing the project](#reproducing-the-project)
+  - [Prerequisites](#prerequisites)
+  - [1 — Clone & install dependencies](#1--clone--install-dependencies)
+  - [2 — Configure environment](#2--configure-environment)
+  - [3 — Provision cloud resources with Terraform](#3--provision-cloud-resources-with-terraform)
+  - [Option A — Run manually](#option-a--run-manually)
+    - [Run the pipeline](#run-the-pipeline-step-by-step)
+    - [Run dbt models](#run-dbt-models)
+  - [Option B — Run via Kestra](#option-b--run-via-kestra)
+    - [Run the full pipeline via Kestra](#run-the-full-pipeline-via-kestra)
+- [Data warehouse design](#data-warehouse-design)
+- [Dashboard](#dashboard)
+- [Project structure](#project-structure)
+
+---
+
 ## Problem description
 
 The Canary Islands are one of the most visited destinations in Europe, receiving over 13 million tourists per year. Understanding *who* visits, *how* they travel, and *when* demand fluctuates is essential for regional planning, hospitality investment, and tourism policy.
@@ -34,17 +55,16 @@ ISTAC API
 ingestion/download.py  ──►  data/raw/*.csv
                                 │
                                 ▼
-                     ingestion/upload_gcs.py  ──►  GCS: tourism-raw/  (CSV)
-                                │
-                                ▼
                   processing/spark_transform.py
                      (local PySpark, local[*])
                                 │
                                 ▼
-                          data/processed/*
+                          data/processed/*  (Parquet)
                                 │
                                 ▼
-                     ingestion/upload_gcs.py  ──►  GCS: tourism-processed/  (Parquet)
+                     ingestion/upload_gcs.py
+                      ├──►  GCS: tourism-raw/        (raw CSVs)
+                      └──►  GCS: tourism-processed/  (Parquet)
                                 │
                                 ▼
                      ingestion/load_bigquery.py
@@ -91,7 +111,7 @@ ingestion/download.py  ──►  data/raw/*.csv
 - Python 3.11 and [uv](https://docs.astral.sh/uv/) installed
 - [Terraform](https://developer.hashicorp.com/terraform/install) ≥ 1.6
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) running
-- Java 11+ on `PATH` (required by PySpark)
+- Java 17 on `PATH` (required by PySpark 3.5 — versions 21+ are not supported)
 - A GCP project with billing enabled
 
 ### 1 — Clone & install dependencies
@@ -104,11 +124,16 @@ uv sync
 
 #### GCP initial setup (once per project)
 
-**1. Enable the required APIs:**
+**1. Authenticate and set your project:**
 
 ```bash
+gcloud auth login
 gcloud config set project <your-gcp-project-id>
+```
 
+**2. Enable the required APIs:**
+
+```bash
 gcloud services enable \
   cloudresourcemanager.googleapis.com \
   iam.googleapis.com \
@@ -120,7 +145,7 @@ Or via the GCP Console: **APIs & Services → Enable APIs and Services**, search
 enable: *Cloud Resource Manager API*, *Identity and Access Management (IAM) API*,
 *Cloud Storage API*, *BigQuery API*.
 
-**2. Create an admin service account and download the key:**
+**3. Create an admin service account and download the key:**
 
 ```bash
 gcloud iam service-accounts create terraform-admin \
@@ -134,7 +159,7 @@ gcloud iam service-accounts keys create credentials/service_account.json \
   --iam-account="terraform-admin@<your-gcp-project-id>.iam.gserviceaccount.com"
 ```
 
-Check the credentials/service_account.json is created.
+Check the credentials/service_account.json file is created in the project folder.
 
 This key is used only by Terraform to provision resources. The pipeline uses a separate
 SA key (`credentials/pipeline_sa.json`) that Terraform creates automatically.
@@ -160,6 +185,8 @@ GCP_REGION=europe-west1
 GOOGLE_APPLICATION_CREDENTIALS=credentials/pipeline_sa.json
 ```
 
+Be sure to reload you terminal to load the .env configuration.
+
 ### 3 — Provision cloud resources with Terraform
 
 ```bash
@@ -176,9 +203,13 @@ This creates:
 - Service account `tourism-pipeline` with Storage + BigQuery admin roles
 - Pipeline SA key written to `credentials/pipeline_sa.json`
 
-### 4 — Run the pipeline manually (step by step)
+---
 
-> **Skip this step if you plan to use Kestra (step 6)** — the Kestra flow runs all these commands automatically.
+### Option A — Run manually
+
+> Use this option to run or test individual steps from the command line.
+
+### Run the pipeline (step by step)
 
 ```bash
 # Download raw CSVs from ISTAC API
@@ -194,46 +225,65 @@ uv run main.py upload
 uv run main.py load
 ```
 
-### 5 — Run dbt models (optional if using Kestra)
+### Run dbt models
 
-> **If using Kestra (step 6):** skip this step entirely. The dbt profile is bundled
-> in `dbt/profiles.yml` and reads `GCP_PROJECT_ID` / `GCP_REGION` /
-> `GOOGLE_APPLICATION_CREDENTIALS` from the environment automatically.
-
-To run dbt manually:
-
-```bash
-cd dbt
-uv run dbt run           # creates staging views + mart tables
-uv run dbt test          # optional: run schema tests
-cd ..
-```
-
-The profile at `dbt/profiles.yml` uses environment variables — make sure they are
-exported in your shell (or `source .env`) before running dbt locally:
+From the project root:
 
 ```bash
 export GCP_PROJECT_ID=<your-gcp-project-id>
 export GCP_REGION=europe-west1
-export GOOGLE_APPLICATION_CREDENTIALS=/absolute/path/to/credentials/pipeline_sa.json
+export GOOGLE_APPLICATION_CREDENTIALS=$(pwd)/credentials/pipeline_sa.json
+
+uv run dbt run --project-dir dbt --profiles-dir dbt   # creates staging views + mart tables
+uv run dbt test --project-dir dbt --profiles-dir dbt  # optional: run schema tests
 ```
 
-### 6 — Run the full pipeline via Kestra
+---
+
+### Option B — Run via Kestra
+
+> Use this option to run the full end-to-end pipeline orchestrated by Kestra, including
+> the quarterly schedule.
+
+### Run the full pipeline via Kestra
 
 ```bash
 docker compose up -d
 ```
 
-Then open **http://localhost:8080**.
+Then open **http://localhost:8080**
 
-First time: Kestra shows a setup wizard — create your admin user (e.g.
-`admin@kestra.io` / `Admin1234`).
+If you are prompted to create an admin account, you can use for instance:
+- user: admin@kestra.io
+- password: Admin1234
 
 1. Go to **Flows** and confirm `canary-islands-tourism-pipeline` (namespace `tourism`)
    is listed. If it is not, click **+** → paste the contents of `kestra/pipeline.yml`
    → **Save**.
 2. To trigger a manual run: open the flow → **Execute** → **Execute now**.
 3. The quarterly schedule triggers automatically on Jan 1, Apr 1, Jul 1, Oct 1 at 06:00 UTC.
+
+---
+
+## Data warehouse design
+
+All BigQuery tables in `tourism_raw.*` are **partitioned by `period_date` (MONTH)** and
+**clustered** on the most-queried filter columns.
+
+| Table | Clustering columns | Rationale |
+|---|---|---|
+| `tourist_accommodations` | `territorio_code`, `tipo_alojamiento_code`, `pais_residencia_code` | Dashboard filters by territory and accommodation type; country is a common WHERE clause |
+| `tourist_age_sex` | `territorio_code`, `sexo_code`, `edad_code` | Demographic queries always filter by sex and age group |
+| `tourist_revenue` | `territorio_code`, `medidas_code` | Revenue queries are almost always scoped to a territory and measure type |
+
+**Why MONTH partitioning on `period_date`?**  
+The data is quarterly but stored as the first day of each quarter (a DATE). Month
+granularity is the finest that avoids partition proliferation while still allowing
+BigQuery's partition pruning to skip irrelevant quarters when filtering by date range
+(e.g. `WHERE period_date BETWEEN '2020-01-01' AND '2021-12-31'`).
+
+**Why these clustering columns?**  
+All dashboard queries filter by territory (Canary Islands vs sub-regions), and the two main analytical dimensions are accommodation type and demographic segment (sex + age group). Clustering on these columns means BigQuery scans the minimum number of blocks for each query, reducing both cost and latency.
 
 ---
 
@@ -273,28 +323,6 @@ Shows the **number of tourists per year** grouped by age group
 ![chart2](img/chart2.png)
 
 We can see how the year of COVID is reflected and, interestingly, how the following year there was the unique circumstance that the number of tourists under 44 years of age was greater than that of those over 44 years of age.
-
----
-
-## Data warehouse design
-
-All BigQuery tables in `tourism_raw.*` are **partitioned by `period_date` (MONTH)** and
-**clustered** on the most-queried filter columns.
-
-| Table | Clustering columns | Rationale |
-|---|---|---|
-| `tourist_accommodations` | `territorio_code`, `tipo_alojamiento_code`, `pais_residencia_code` | Dashboard filters by territory and accommodation type; country is a common WHERE clause |
-| `tourist_age_sex` | `territorio_code`, `sexo_code`, `edad_code` | Demographic queries always filter by sex and age group |
-| `tourist_revenue` | `territorio_code`, `medidas_code` | Revenue queries are almost always scoped to a territory and measure type |
-
-**Why MONTH partitioning on `period_date`?**  
-The data is quarterly but stored as the first day of each quarter (a DATE). Month
-granularity is the finest that avoids partition proliferation while still allowing
-BigQuery's partition pruning to skip irrelevant quarters when filtering by date range
-(e.g. `WHERE period_date BETWEEN '2020-01-01' AND '2021-12-31'`).
-
-**Why these clustering columns?**  
-All dashboard queries filter by territory (Canary Islands vs sub-regions), and the two main analytical dimensions are accommodation type and demographic segment (sex + age group). Clustering on these columns means BigQuery scans the minimum number of blocks for each query, reducing both cost and latency.
 
 ---
 
